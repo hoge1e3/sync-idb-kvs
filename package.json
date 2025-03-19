@@ -1,0 +1,17 @@
+{
+  "name": "sync-idb-kvs",
+  "version": "1.2.8",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx http-server -o test/index.html",
+    "build": "npx tsc "
+  },
+  "devDependencies": {
+    "typescript": "^4.5.5"
+  },
+  "keywords": ["IndexedDB", "key-value-store"],
+  "author": "hoge1e3",
+  "license": "MIT",
+  "type": "module",
+  "description": "Synchronous IndexedDB Key-Value Store(Requires async Initialization)"
+}

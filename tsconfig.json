@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+      // ソースマップを有効化
+      "sourceMap": true,
+      // TSはECMAScript 5に変換
+      "target": "es2021",
+      "lib": ["es2021"],
+      // TSのモジュールはES Modulesとして出力
+      "module": "esnext",
+      //"allowImportingTsExtensions": true,
+      //"noEmit": true,
+      "moduleResolution": "node",
+      "declaration": true,
+      // 厳密モードとして設定
+      "strict": true,
+      //"outDir":"./js"
+    },
+    "include": ["src","test"]
+  }
