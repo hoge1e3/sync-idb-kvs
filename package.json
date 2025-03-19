@@ -1,17 +1,32 @@
 {
   "name": "sync-idb-kvs",
   "version": "1.2.8",
+  "description": "Synchronous IndexedDB Key-Value Store(Requires async Initialization)",
+  "keywords": [
+    "IndexedDB",
+    "key-value-store"
+  ],
+  "homepage": "https://github.com/hoge1e3/sync-idb-kvs#readme",
+  "bugs": {
+    "url": "https://github.com/hoge1e3/sync-idb-kvs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoge1e3/sync-idb-kvs.git"
+  },
+  "license": "MIT",
+  "author": "hoge1e3",
+  "type": "module",
+  "types": "src/index.d.ts",
   "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
   "scripts": {
     "test": "npx http-server -o test/index.html",
     "build": "npx tsc "
   },
   "devDependencies": {
     "typescript": "^4.5.5"
-  },
-  "keywords": ["IndexedDB", "key-value-store"],
-  "author": "hoge1e3",
-  "license": "MIT",
-  "type": "module",
-  "description": "Synchronous IndexedDB Key-Value Store(Requires async Initialization)"
+  }
 }
