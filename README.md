@@ -3,7 +3,7 @@ Synchronous IndexedDB Key-Value Store(Requires async Initialization)
 
 # API
 ```ts
-class SyncStorage {
+class SyncIDBStorage {
     // Create storage and fetch all data from idb to memory
     static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncStorage>;
     // Provides localStorage-like synchronous interface

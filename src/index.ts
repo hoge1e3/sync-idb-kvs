@@ -6,12 +6,12 @@ export interface IStorage {
     keys(): IterableIterator<string>; 
     reload(key:string):Promise<string|null>;
 }
-export class SyncStorage implements IStorage {
+export class SyncIDBStorage implements IStorage {
     private db: IDBDatabase | null = null;
     private memoryCache: Record<string, string> = {}; // メモリキャッシュ
     uncommited=0;
-    static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncStorage> {
-        const s=new SyncStorage(dbName, storeName);
+    static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncIDBStorage> {
+        const s=new SyncIDBStorage(dbName, storeName);
         await s._initDB();
         return s;
     }

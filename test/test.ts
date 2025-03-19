@@ -1,4 +1,4 @@
-import { SyncStorage } from '../src/index.js';
+import { SyncIDBStorage } from '../src/index.js';
 const assert={
     equal(a:any,b:any){
         if(a!==b){
@@ -7,7 +7,7 @@ const assert={
     }
 };
 const sleep=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
-const storage = await SyncStorage.create();
+const storage = await SyncIDBStorage.create();
 (globalThis as any).storage = storage;
 let theValue;
 const reg=/value\d+\.\d+/;
