@@ -8,7 +8,7 @@ export interface IStorage {
 }
 export class SyncIDBStorage implements IStorage {
     private db: IDBDatabase | null = null;
-    private memoryCache: Record<string, string> = {}; // メモリキャッシュ
+    memoryCache: Record<string, string> = {}; // メモリキャッシュ
     uncommited=0;
     static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncIDBStorage> {
         const s=new SyncIDBStorage(dbName, storeName);
@@ -72,9 +72,13 @@ export class SyncIDBStorage implements IStorage {
     async reload(key: string): Promise<string|null> {
         const value=await this._getFromIndexedDB(key);
         if (value){
-            this.memoryCache[key]=value;
+            if (value!==this.memoryCache[key]){
+                this.memoryCache[key]=value;
+            }
         } else {
-            delete this.memoryCache[key];
+            if (key in this.memoryCache) {
+                delete this.memoryCache[key];    
+            }
         }
         return value;
     }
