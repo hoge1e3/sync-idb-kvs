@@ -24,6 +24,9 @@
   },
   "scripts": {
     "test": "npx http-server -o test/index.html",
+    "tsc":"npx tsc",
+    "webpack": "echo no-webpack-needed",
+    "webpack-dev": "echo no-webpack-needed",
     "build": "npx tsc "
   },
   "devDependencies": {
