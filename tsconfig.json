@@ -14,6 +14,7 @@
       // 厳密モードとして設定
       "strict": true,
       //"outDir":"./js"
+      "tsBuildInfoFile": "./.tsbuildinfo",
     },
     "include": ["src","test"]
   }
