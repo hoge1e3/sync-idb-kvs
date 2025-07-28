@@ -31,5 +31,9 @@
   },
   "devDependencies": {
     "typescript": "^4.5.5"
-  }
+  },
+  "files": [
+    "tsconfig.json",
+    "src"
+  ]
 }
