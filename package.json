@@ -1,6 +1,6 @@
 {
   "name": "sync-idb-kvs",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Synchronous IndexedDB Key-Value Store(Requires async Initialization)",
   "keywords": [
     "IndexedDB",
