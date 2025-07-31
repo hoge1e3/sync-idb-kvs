@@ -1,6 +1,6 @@
 {
   "name": "sync-idb-kvs",
-  "version": "1.4.4",
+  "version": "1.4.6",
   "description": "Synchronous IndexedDB Key-Value Store(Requires async Initialization)",
   "keywords": [
     "IndexedDB",
@@ -30,7 +30,8 @@
     "build": "npx tsc "
   },
   "devDependencies": {
-    "typescript": "^4.5.5"
+    "typescript": "^4.5.5",
+    "@types/web": "^0.0.175"
   },
   "files": [
     "tsconfig.json",
