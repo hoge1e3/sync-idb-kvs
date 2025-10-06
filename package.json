@@ -30,7 +30,7 @@
     "build": "npx tsc "
   },
   "devDependencies": {
-    "typescript": "^4.5.5",
+    "typescript": "^5.7.2",
     "@types/web": "^0.0.175"
   },
   "files": [
