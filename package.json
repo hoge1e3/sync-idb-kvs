@@ -30,11 +30,14 @@
     "build": "npx tsc "
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "@types/web": "^0.0.175"
+    "@types/web": "^0.0.175",
+    "typescript": "^5.7.2"
   },
   "files": [
     "tsconfig.json",
     "src"
-  ]
+  ],
+  "dependencies": {
+    "mutable-promise": "^1.1.15"
+  }
 }

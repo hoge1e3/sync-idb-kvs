@@ -1,3 +1,5 @@
+import MutablePromise from "mutable-promise";
+
 export interface IStorage {
     setItem(key: string, value: string): void;
     getItem(key: string): string | null;
@@ -9,7 +11,7 @@ export interface IStorage {
 export class SyncIDBStorage implements IStorage {
     private db: IDBDatabase | null = null;
     memoryCache: Record<string, string> = {}; // メモリキャッシュ
-    uncommited=0;
+    uncommitedCounter=new UncommitCounter();
     static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncIDBStorage> {
         const s=new SyncIDBStorage(dbName, storeName);
         await s._initDB();
@@ -94,23 +96,48 @@ export class SyncIDBStorage implements IStorage {
     }
     private async _saveToIndexedDB(key: string, value: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            this.uncommited++;
+            this.uncommitedCounter.inc();
             if (!this.db) return resolve();
             const transaction = this.db.transaction(this.storeName, "readwrite");
             const store = transaction.objectStore(this.storeName);
             const request = store.put(value, key);
             request.onsuccess = () => resolve();
             request.onerror = (event) => reject((event.target as IDBRequest).error);
-        }).finally(()=>{this.uncommited--;});
+        }).finally(()=>{this.uncommitedCounter.dec();});
     }
     private async _deleteFromIndexedDB(key: string): Promise<void> {
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             if (!this.db) return resolve();
+            this.uncommitedCounter.inc();
             const transaction = this.db.transaction(this.storeName, "readwrite");
             const store = transaction.objectStore(this.storeName);
             const request = store.delete(key);
             request.onsuccess = () => resolve();
             request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        }).finally(()=>{this.uncommitedCounter.dec();});
+    }
+    async waitForCommit(){
+        return await this.uncommitedCounter.wait();
+    }
+}
+class UncommitCounter {
+    private value=0;
+    private promise: MutablePromise<void>|undefined;
+    inc() {
+        this.value++;
+        if (!this.promise) this.promise=new MutablePromise<void>();
+    }
+    dec() {
+        this.value--;
+        if (this.value<0) throw new Error("UncommitCounter: Invalid counter state.");
+        if (this.value==0) {
+            if (!this.promise) throw new Error("UncommitCounter: Invalid promise state.");
+            this.promise.resolve();
+            delete this.promise;
+        }
+    }
+    async wait(){
+        if (!this.promise) return;
+        await this.promise;
     }
 }

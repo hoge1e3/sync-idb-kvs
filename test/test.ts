@@ -21,10 +21,7 @@ if(m){
     theValue="value"+Math.random();
     storage.setItem('key', theValue);
     assert.equal(storage.getItem('key'), theValue);
-    while(storage.uncommited){
-        console.log(storage.uncommited);
-        await sleep(1);
-    }
+    await storage.waitForCommit();
     await sleep(1000);
     location.href+="?"+theValue;
 }
