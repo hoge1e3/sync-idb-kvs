@@ -30,8 +30,8 @@
     "build": "npx tsc "
   },
   "devDependencies": {
-    "@types/web": "^0.0.175",
-    "typescript": "^5.7.2"
+    "@types/web": "^0.0.278",
+    "typescript": "^5.8.3"
   },
   "files": [
     "tsconfig.json",
