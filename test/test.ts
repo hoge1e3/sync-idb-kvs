@@ -7,7 +7,7 @@ const assert={
     }
 };
 const sleep=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
-const storage = await SyncIDBStorage.create();
+const storage = await SyncIDBStorage.create("SyncStorageDB", {});
 (globalThis as any).storage = storage;
 let theValue;
 const reg=/value\d+\.\d+/;

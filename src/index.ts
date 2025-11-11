@@ -8,39 +8,75 @@ export interface IStorage {
     keys(): IterableIterator<string>; 
     reload(key:string):Promise<string|null>;
 }
+export type SyncIDBStorageOptions={
+  // 0 wait for loadall on mount
+  // 1 start loadall but not wait on mount
+  // 2 postpone loadall until first access
+  lazy?:0|1|2,
+};
+const storeName="kvStore";
 export class SyncIDBStorage implements IStorage {
     //private db: IDBDatabase | null = null;
     memoryCache: Record<string, string> = {}; // メモリキャッシュ
     //uncommitedCounter=new UncommitCounter();
-    static async create(dbName = "SyncStorageDB", storeName = "kvStore"): Promise<SyncIDBStorage> {
-        const a=new AsyncIDBStorage(dbName, storeName);
-        const s=new SyncIDBStorage(a,dbName);
-        await a.initDB(s);
-        return s;
+    loadedAll=false;
+    loadingPromise?:Promise<void>;
+    getLoadingPromise(){
+      if(this.loadedAll)return Promise.resolve();
+      this.loadingPromise=this.loadingPromise||
+        this.asyncStorage.initDB(this).then(
+          ()=>{this.loadedAll=true;}
+        );
+      return this.loadingPromise;
     }
+    
+    static async create(dbName:string, 
+      initialData:Record<string,string>,
+      opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage> {
+      const a=new AsyncIDBStorage(dbName, initialData);
+      const s=new SyncIDBStorage(a,dbName);
+      opt.lazy=opt.lazy||0;
+      if(opt.lazy<2)s.getLoadingPromise();
+      if(!opt.lazy)await s.getLoadingPromise();
+      return s;
+    }
+    ensureLoaded(){
+      if(this.loadedAll)return ;
+      throw Object.assign(
+        new Error(`${this.channelName}: Now loading. Try again later.`),
+        {retryPromise:this.getLoadingPromise(),}
+      );
+    }
+    
     constructor(
         public asyncStorage:AsyncIDBStorage,
-        public channelName:string) {}
+        public channelName:string,
+    ) {}
     getItem(key: string): string | null {
         return this.memoryCache[key] ?? null;
     }
     setItem(key: string, value: string): void {
+        this.ensureLoaded();
         this.memoryCache[key] = value;
         //this._saveToIndexedDB(key, value);
         this.asyncStorage.setItem(key,value);
     }
     removeItem(key: string): void {
+        this.ensureLoaded();
         delete this.memoryCache[key];
         //this._deleteFromIndexedDB(key);
         this.asyncStorage.removeItem(key);
     }
     itemExists(key: string): boolean {
+        this.ensureLoaded();
         return key in this.memoryCache;
     }
     keys(): IterableIterator<string> {
+        this.ensureLoaded();
         return Object.keys(this.memoryCache)[Symbol.iterator]();
     }
     async reload(key: string): Promise<string|null> {
+        await this.getLoadingPromise();
         //const value=await this._getFromIndexedDB(key);
         const value=await this.asyncStorage.getItem(key);
         if (value){
@@ -69,14 +105,15 @@ export class AsyncIDBStorage {
     uncommitedCounter=new UncommitCounter();
     constructor(
         public dbName = "SyncStorageDB", 
-        public storeName = "kvStore") {}
+        public initialData:Record<string,string>,
+    ) {}
     async initDB(s:SyncIDBStorage): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
             request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
                 const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(this.storeName)) {
-                    db.createObjectStore(this.storeName);
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName);
                 }
             };
             request.onsuccess = (event: Event) => {
@@ -87,8 +124,8 @@ export class AsyncIDBStorage {
         });
     }
     async loadAllData(s: SyncIDBStorage): Promise<void> {
-        const transaction = this.db!.transaction(this.storeName, "readonly");
-        const store = transaction.objectStore(this.storeName);
+        const transaction = this.db!.transaction(storeName, "readonly");
+        const store = transaction.objectStore(storeName);
         // Get all keys and values in the same transaction
         const [keys,values]= await Promise.all([
           idbReqPromise(store.getAllKeys()) as Promise<string[]>,
@@ -100,13 +137,17 @@ export class AsyncIDBStorage {
                 s.memoryCache[key] = values[i] ?? "";
             }
         });
-      
+        for (let key in this.initialData) {
+            if (!(key in s.memoryCache)){
+                s.memoryCache[key] = this.initialData[key];
+            }
+        }
     }
     async getItem(key: string): Promise<string | null> {
         return new Promise((resolve, reject) => {
             if (!this.db) return resolve(null);
-            const transaction = this.db.transaction(this.storeName, "readonly");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName, "readonly");
+            const store = transaction.objectStore(storeName);
             const request = store.get(key);
             request.onsuccess = () => resolve(request.result ?? null);
             request.onerror = () => reject(request.error);
@@ -116,8 +157,8 @@ export class AsyncIDBStorage {
         return new Promise<void>((resolve, reject) => {
             this.uncommitedCounter.inc();
             if (!this.db) return resolve();
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName, "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.put(value, key);
             request.onsuccess = () => resolve();
             request.onerror = (event) => reject((event.target as IDBRequest).error);
@@ -127,8 +168,8 @@ export class AsyncIDBStorage {
         return new Promise<void>((resolve, reject) => {
             if (!this.db) return resolve();
             this.uncommitedCounter.inc();
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName, "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.delete(key);
             request.onsuccess = () => resolve();
             request.onerror = (event) => reject((event.target as IDBRequest).error);
