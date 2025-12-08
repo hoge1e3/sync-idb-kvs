@@ -7,6 +7,7 @@ export interface IStorage {
     itemExists(key: string): boolean;
     keys(): IterableIterator<string>; 
     reload(key:string):Promise<string|null>;
+    waitForCommit():Promise<void>;
 }
 export type SyncIDBStorageOptions={
   // 0 wait for loadall on mount
