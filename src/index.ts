@@ -1,6 +1,7 @@
 import MutablePromise from "mutable-promise";
 
 export interface IStorage {
+    storageType: string;
     setItem(key: string, value: string): void;
     getItem(key: string): string | null;
     removeItem(key: string): void;
@@ -17,6 +18,7 @@ export type SyncIDBStorageOptions={
 };
 const storeName="kvStore";
 export class SyncIDBStorage implements IStorage {
+    storageType="idb";
     //private db: IDBDatabase | null = null;
     memoryCache: Record<string, string> = {}; // メモリキャッシュ
     //uncommitedCounter=new UncommitCounter();
