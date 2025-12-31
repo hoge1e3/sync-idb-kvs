@@ -24,11 +24,16 @@ export class SyncIDBStorage implements IStorage {
     //uncommitedCounter=new UncommitCounter();
     loadedAll=false;
     loadingPromise?:Promise<void>;
-    getLoadingPromise(){
+    passiveLoadingPromise=new MutablePromise();
+    getLoadingPromise(passive=false){
       if(this.loadedAll)return Promise.resolve();
+      if(passive)return this.passiveLoadingPromise;
       this.loadingPromise=this.loadingPromise||
         this.asyncStorage.initDB(this).then(
-          ()=>{this.loadedAll=true;}
+          ()=>{
+            this.loadedAll=true;
+            this.passiveLoadingPromise.resolve(void 0);
+          }
         );
       return this.loadingPromise;
     }
