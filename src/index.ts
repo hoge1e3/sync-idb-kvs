@@ -1,13 +1,13 @@
 import MutablePromise from "mutable-promise";
 
-export interface IStorage {
+export interface IStorage<T> {
     storageType: string;
-    setItem(key: string, value: string): void;
-    getItem(key: string): string | null;
+    setItem(key: string, value: T): void;
+    getItem(key: string): T | null;
     removeItem(key: string): void;
     itemExists(key: string): boolean;
     keys(): IterableIterator<string>; 
-    reload(key:string):Promise<string|null>;
+    reload(key:string):Promise<T|null>;
     waitForCommit():Promise<void>;
 }
 export type SyncIDBStorageOptions={
@@ -17,10 +17,10 @@ export type SyncIDBStorageOptions={
   lazy?:0|1|2,
 };
 const storeName="kvStore";
-export class SyncIDBStorage implements IStorage {
+export class SyncIDBStorage<T> implements IStorage<T> {
     storageType="idb";
     //private db: IDBDatabase | null = null;
-    memoryCache: Record<string, string> = {}; // メモリキャッシュ
+    memoryCache: Record<string, T> = {}; // メモリキャッシュ
     //uncommitedCounter=new UncommitCounter();
     loadedAll=false;
     loadingPromise?:Promise<void>;
@@ -38,11 +38,11 @@ export class SyncIDBStorage implements IStorage {
       return this.loadingPromise;
     }
     
-    static async create(dbName:string, 
-      initialData:Record<string,string>,
-      opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage> {
-      const a=new AsyncIDBStorage(dbName, initialData);
-      const s=new SyncIDBStorage(a,dbName);
+    static async create<T=string>(dbName:string, 
+      initialData:Record<string,T>,
+      opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage<T>> {
+      const a=new AsyncIDBStorage<T>(dbName, initialData);
+      const s=new SyncIDBStorage<T>(a,dbName);
       opt.lazy=opt.lazy||0;
       if(opt.lazy<2)s.getLoadingPromise();
       if(!opt.lazy)await s.getLoadingPromise();
@@ -57,13 +57,13 @@ export class SyncIDBStorage implements IStorage {
     }
     
     constructor(
-        public asyncStorage:AsyncIDBStorage,
+        public asyncStorage:AsyncIDBStorage<T>,
         public channelName:string,
     ) {}
-    getItem(key: string): string | null {
+    getItem(key: string): T | null {
         return this.memoryCache[key] ?? null;
     }
-    setItem(key: string, value: string): void {
+    setItem(key: string, value: T): void {
         this.ensureLoaded();
         this.memoryCache[key] = value;
         //this._saveToIndexedDB(key, value);
@@ -83,7 +83,7 @@ export class SyncIDBStorage implements IStorage {
         this.ensureLoaded();
         return Object.keys(this.memoryCache)[Symbol.iterator]();
     }
-    async reload(key: string): Promise<string|null> {
+    async reload(key: string): Promise<T|null> {
         await this.getLoadingPromise();
         //const value=await this._getFromIndexedDB(key);
         const value=await this.asyncStorage.getItem(key);
@@ -108,14 +108,14 @@ export function idbReqPromise<T>(request:IDBRequest<T>){
     request.onerror = () => reject(request.error);
   });
 }
-export class AsyncIDBStorage {
+export class AsyncIDBStorage<T> {
     private db: IDBDatabase | null = null;
     uncommitedCounter=new UncommitCounter();
     constructor(
         public dbName = "SyncStorageDB", 
-        public initialData:Record<string,string>,
+        public initialData:Record<string,T>,
     ) {}
-    async initDB(s:SyncIDBStorage): Promise<void> {
+    async initDB(s:SyncIDBStorage<T>): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
             request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
@@ -131,7 +131,7 @@ export class AsyncIDBStorage {
             request.onerror = (event: Event) => reject((event.target as IDBOpenDBRequest).error);
         });
     }
-    async loadAllData(s: SyncIDBStorage): Promise<void> {
+    async loadAllData(s: SyncIDBStorage<T>): Promise<void> {
         const transaction = this.db!.transaction(storeName, "readonly");
         const store = transaction.objectStore(storeName);
         // Get all keys and values in the same transaction
@@ -151,7 +151,7 @@ export class AsyncIDBStorage {
             }
         }
     }
-    async getItem(key: string): Promise<string | null> {
+    async getItem(key: string): Promise<T | null> {
         return new Promise((resolve, reject) => {
             if (!this.db) return resolve(null);
             const transaction = this.db.transaction(storeName, "readonly");
@@ -161,7 +161,7 @@ export class AsyncIDBStorage {
             request.onerror = () => reject(request.error);
         });
     }
-    async setItem(key: string, value: string): Promise<void> {
+    async setItem(key: string, value: T): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             this.uncommitedCounter.inc();
             if (!this.db) return resolve();
