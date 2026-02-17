@@ -38,7 +38,7 @@ export class SyncIDBStorage<T> implements IStorage<T> {
       return this.loadingPromise;
     }
     
-    static async create<T=string>(dbName:string, 
+    static async create<T>(dbName:string, 
       initialData:Record<string,T>,
       opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage<T>> {
       const a=new AsyncIDBStorage<T>(dbName, initialData);
