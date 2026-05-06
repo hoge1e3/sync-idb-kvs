@@ -14,7 +14,8 @@ export type SyncIDBStorageOptions={
   // 0 wait for loadall on mount
   // 1 start loadall but not wait on mount
   // 2 postpone loadall until first access
-  lazy?:0|1|2,
+  // 3 load only accessed item
+  lazy?:0|1|2|3,
 };
 const storeName="kvStore";
 export class SyncIDBStorage<T> implements IStorage<T> {
@@ -30,8 +31,8 @@ export class SyncIDBStorage<T> implements IStorage<T> {
       if(passive)return this.passiveLoadingPromise;
       this.loadingPromise=this.loadingPromise||
         this.asyncStorage.initDB(this).then(
-          ()=>{
-            this.loadedAll=true;
+          (loadedAll)=>{
+            this.loadedAll=loadedAll;
             this.passiveLoadingPromise.resolve(void 0);
           }
         );
@@ -41,14 +42,14 @@ export class SyncIDBStorage<T> implements IStorage<T> {
     static async create<T>(dbName:string, 
       initialData:Record<string,T>,
       opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage<T>> {
-      const a=new AsyncIDBStorage<T>(dbName, initialData);
-      const s=new SyncIDBStorage<T>(a,dbName);
       opt.lazy=opt.lazy||0;
+      const a=new AsyncIDBStorage<T>(dbName, initialData,opt.lazy===3);
+      const s=new SyncIDBStorage<T>(a,dbName);
       if(opt.lazy<2)s.getLoadingPromise();
       if(!opt.lazy)await s.getLoadingPromise();
       return s;
     }
-    ensureLoaded(){
+    ensureLoaded(key:string|null){//null for all
       if(this.loadedAll)return ;
       throw Object.assign(
         new Error(`${this.channelName}: Now loading. Try again later.`),
@@ -61,26 +62,27 @@ export class SyncIDBStorage<T> implements IStorage<T> {
         public channelName:string,
     ) {}
     getItem(key: string): T | null {
+        // should call itemExists in advance
         return this.memoryCache[key] ?? null;
     }
     setItem(key: string, value: T): void {
-        this.ensureLoaded();
+        this.ensureLoaded(key);
         this.memoryCache[key] = value;
         //this._saveToIndexedDB(key, value);
         this.asyncStorage.setItem(key,value);
     }
     removeItem(key: string): void {
-        this.ensureLoaded();
+        this.ensureLoaded(key);
         delete this.memoryCache[key];
         //this._deleteFromIndexedDB(key);
         this.asyncStorage.removeItem(key);
     }
     itemExists(key: string): boolean {
-        this.ensureLoaded();
+        this.ensureLoaded(key);
         return key in this.memoryCache;
     }
     keys(): IterableIterator<string> {
-        this.ensureLoaded();
+        this.ensureLoaded(null);
         return Object.keys(this.memoryCache)[Symbol.iterator]();
     }
     async reload(key: string): Promise<T|null> {
@@ -114,9 +116,10 @@ export class AsyncIDBStorage<T> {
     constructor(
         public dbName = "SyncStorageDB", 
         public initialData:Record<string,T>,
+        public doNotLoadAll:boolean,
     ) {}
-    async initDB(s:SyncIDBStorage<T>): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
+    async initDB(s:SyncIDBStorage<T>): Promise<boolean> {
+        return new Promise<boolean>((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
             request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
                 const db = (event.target as IDBOpenDBRequest).result;
@@ -126,7 +129,8 @@ export class AsyncIDBStorage<T> {
             };
             request.onsuccess = (event: Event) => {
                 this.db = (event.target as IDBOpenDBRequest).result;
-                this.loadAllData(s).then(resolve).catch(reject);
+                if (this.doNotLoadAll) return resolve(false);
+                this.loadAllData(s).then(()=>resolve(true)).catch(reject);
             };
             request.onerror = (event: Event) => reject((event.target as IDBOpenDBRequest).error);
         });
@@ -153,7 +157,7 @@ export class AsyncIDBStorage<T> {
     }
     async getItem(key: string): Promise<T | null> {
         return new Promise((resolve, reject) => {
-            if (!this.db) return resolve(null);
+            if (!this.db) throw new Error("db is not init.");
             const transaction = this.db.transaction(storeName, "readonly");
             const store = transaction.objectStore(storeName);
             const request = store.get(key);
@@ -163,8 +167,8 @@ export class AsyncIDBStorage<T> {
     }
     async setItem(key: string, value: T): Promise<void> {
         return new Promise<void>((resolve, reject) => {
+            if (!this.db) throw new Error("db is not init.");
             this.uncommitedCounter.inc();
-            if (!this.db) return resolve();
             const transaction = this.db.transaction(storeName, "readwrite");
             const store = transaction.objectStore(storeName);
             const request = store.put(value, key);
@@ -174,7 +178,7 @@ export class AsyncIDBStorage<T> {
     }
     async removeItem(key: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            if (!this.db) return resolve();
+            if (!this.db) throw new Error("db is not init.");
             this.uncommitedCounter.inc();
             const transaction = this.db.transaction(storeName, "readwrite");
             const store = transaction.objectStore(storeName);
