@@ -10,56 +10,79 @@ export interface IStorage<T> {
     reload(key:string):Promise<T|null>;
     waitForCommit():Promise<void>;
 }
+export type LazyLevel=0|1|2|3;
 export type SyncIDBStorageOptions={
   // 0 wait for loadall on mount
   // 1 start loadall but not wait on mount
   // 2 postpone loadall until first access
-  // 3 load only accessed item
-  lazy?:0|1|2|3,
+  // 3 load only accessed item (never loadall)
+  lazy?:LazyLevel,
 };
 const storeName="kvStore";
 export class SyncIDBStorage<T> implements IStorage<T> {
     storageType="idb";
     //private db: IDBDatabase | null = null;
-    memoryCache: Record<string, T> = {}; // メモリキャッシュ
+    memoryCache: Record<string, T|null> = {}; // null for level 3 and not-existent.
     //uncommitedCounter=new UncommitCounter();
     loadedAll=false;
-    loadingPromise?:Promise<void>;
-    passiveLoadingPromise=new MutablePromise();
+    _readyPromise?:Promise<void>;
+    passiveReadyPromise=new MutablePromise();
+    /**@deprecated Use getReadyPromise or loadingPromise*/
     getLoadingPromise(passive=false){
+        return this.readyPromise(passive);
+    }
+    readyPromise(passive=false){// was getLoadingPromise
       if(this.loadedAll)return Promise.resolve();
-      if(passive)return this.passiveLoadingPromise;
-      this.loadingPromise=this.loadingPromise||
+      if(passive)return this.passiveReadyPromise;
+      this._readyPromise=this._readyPromise||
         this.asyncStorage.initDB(this).then(
           (loadedAll)=>{
             this.loadedAll=loadedAll;
-            this.passiveLoadingPromise.resolve(void 0);
+            this.passiveReadyPromise.resolve(void 0);
           }
         );
-      return this.loadingPromise;
+      return this._readyPromise;
     }
-    
     static async create<T>(dbName:string, 
       initialData:Record<string,T>,
       opt={} as SyncIDBStorageOptions): Promise<SyncIDBStorage<T>> {
       opt.lazy=opt.lazy||0;
       const a=new AsyncIDBStorage<T>(dbName, initialData,opt.lazy===3);
-      const s=new SyncIDBStorage<T>(a,dbName);
-      if(opt.lazy<2)s.getLoadingPromise();
-      if(!opt.lazy)await s.getLoadingPromise();
+      const s=new SyncIDBStorage<T>(a,dbName,opt.lazy);
+      switch(opt.lazy) {
+        case 0:
+            await s.readyPromise(false);
+            break;        
+        case 1:
+            s.readyPromise(false);
+            break;        
+        case 2:
+        case 3:
+            break;
+      }
       return s;
     }
     ensureLoaded(key:string|null){//null for all
       if(this.loadedAll)return ;
+      if(key && key in this.memoryCache) return;
       throw Object.assign(
-        new Error(`${this.channelName}: Now loading. Try again later.`),
-        {retryPromise:this.getLoadingPromise(),}
+        new Error(`${this.channelName}: Now loading ${key?"'"+key+"'":""}. Try again later.`),
+        {retryPromise:this.loadingPromise(key),}
       );
     }
-    
+    private loadingPromise(key:string|null) {//null for all
+        if (this.lazyLevel<3) {
+            return this.readyPromise(false);
+        } else {
+            if (!key) throw new Error("key must be specified on lazy level 3");
+            const p=this.asyncStorage.getItem(key).then((value)=>this.memoryCache[key]=value);
+            return p;
+        }
+    }
     constructor(
         public asyncStorage:AsyncIDBStorage<T>,
         public channelName:string,
+        public lazyLevel: LazyLevel,
     ) {}
     getItem(key: string): T | null {
         // should call itemExists in advance
@@ -79,14 +102,14 @@ export class SyncIDBStorage<T> implements IStorage<T> {
     }
     itemExists(key: string): boolean {
         this.ensureLoaded(key);
-        return key in this.memoryCache;
+        return !!this.memoryCache[key];
     }
     keys(): IterableIterator<string> {
         this.ensureLoaded(null);
         return Object.keys(this.memoryCache)[Symbol.iterator]();
     }
     async reload(key: string): Promise<T|null> {
-        await this.getLoadingPromise();
+        await this.readyPromise(false);
         //const value=await this._getFromIndexedDB(key);
         const value=await this.asyncStorage.getItem(key);
         if (value){
@@ -95,7 +118,7 @@ export class SyncIDBStorage<T> implements IStorage<T> {
             }
         } else {
             if (key in this.memoryCache) {
-                delete this.memoryCache[key];    
+                this.memoryCache[key]=null;    
             }
         }
         return value;

@@ -25,8 +25,8 @@
   "scripts": {
     "test": "npx http-server -o test/index.html",
     "tsc": "npx tsc",
-    "webpack": "echo no-webpack-needed",
-    "webpack-dev": "echo no-webpack-needed",
+    "webpack": "npx webpack --mode=production",
+    "webpack-dev": "npx webpack --mode=development",
     "build": "npx tsc "
   },
   "devDependencies": {
