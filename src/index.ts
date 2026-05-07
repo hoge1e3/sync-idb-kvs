@@ -96,13 +96,13 @@ export class SyncIDBStorage<T> implements IStorage<T> {
     }
     removeItem(key: string): void {
         this.ensureLoaded(key);
-        delete this.memoryCache[key];
+        this.memoryCache[key]=null;
         //this._deleteFromIndexedDB(key);
         this.asyncStorage.removeItem(key);
     }
     itemExists(key: string): boolean {
         this.ensureLoaded(key);
-        return !!this.memoryCache[key];
+        return this.memoryCache[key]!=null;
     }
     keys(): IterableIterator<string> {
         this.ensureLoaded(null);
