@@ -25,6 +25,7 @@ export class SyncIDBStorage<T> implements IStorage<T> {
     memoryCache: Record<string, T|null> = {}; // null for level 3 and not-existent.
     //uncommitedCounter=new UncommitCounter();
     loadedAll=false;
+    dbInited=false;
     _readyPromise?:Promise<void>;
     passiveReadyPromise=new MutablePromise();
     /**@deprecated Use getReadyPromise or loadingPromise*/
@@ -38,6 +39,7 @@ export class SyncIDBStorage<T> implements IStorage<T> {
         this.asyncStorage.initDB(this).then(
           (loadedAll)=>{
             this.loadedAll=loadedAll;
+            this.dbInited=true;
             this.passiveReadyPromise.resolve(void 0);
           }
         );
@@ -70,6 +72,14 @@ export class SyncIDBStorage<T> implements IStorage<T> {
         {retryPromise:this.loadingPromise(key),}
       );
     }
+    ensureReady(){
+      if(this.dbInited)return ;
+      throw Object.assign(
+        new Error(`${this.channelName}: Now initializing DB. Try again later.`),
+        {retryPromise:this.readyPromise(),}
+      );
+    }
+    
     private loadingPromise(key:string|null) {//null for all
         if (this.lazyLevel<3) {
             return this.readyPromise(false);
@@ -89,13 +99,13 @@ export class SyncIDBStorage<T> implements IStorage<T> {
         return this.memoryCache[key] ?? null;
     }
     setItem(key: string, value: T): void {
-        this.ensureLoaded(key);
+        this.ensureReady();
         this.memoryCache[key] = value;
         //this._saveToIndexedDB(key, value);
         this.asyncStorage.setItem(key,value);
     }
     removeItem(key: string): void {
-        this.ensureLoaded(key);
+        this.ensureReady();
         this.memoryCache[key]=null;
         //this._deleteFromIndexedDB(key);
         this.asyncStorage.removeItem(key);
@@ -152,11 +162,23 @@ export class AsyncIDBStorage<T> {
             };
             request.onsuccess = (event: Event) => {
                 this.db = (event.target as IDBOpenDBRequest).result;
-                if (this.doNotLoadAll) return resolve(false);
+                if (this.doNotLoadAll) return this.loadInitialData(s).then(()=>resolve(false)).catch(reject);
                 this.loadAllData(s).then(()=>resolve(true)).catch(reject);
             };
             request.onerror = (event: Event) => reject((event.target as IDBOpenDBRequest).error);
         });
+    }
+    async loadInitialData(s: SyncIDBStorage<T>):Promise<void> {
+        // for lv3
+        //const transaction = this.db!.transaction(storeName, "readonly");
+        //const store = transaction.objectStore(storeName);
+        // Get all keys and values in the same transaction
+        for (let key in this.initialData) {
+            s.memoryCache[key]=await this.getItem(key);
+            if (!s.memoryCache[key]){
+                s.memoryCache[key] = this.initialData[key];
+            }
+        }
     }
     async loadAllData(s: SyncIDBStorage<T>): Promise<void> {
         const transaction = this.db!.transaction(storeName, "readonly");
